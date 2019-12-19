@@ -1,6 +1,6 @@
 {
   "name": "nginx-plus-dynamic-upstream",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Allows to register/unregister app in Nginx+",
   "main": "index.js",
   "scripts": {
