@@ -1,0 +1,24 @@
+{
+  "name": "nginx-plus-dynamic-upstream",
+  "version": "1.0.0",
+  "description": "Allows to register/unregister app in Nginx+",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StyleT/nginx-plus-dynamic-upstream.git"
+  },
+  "keywords": [
+    "nginx",
+    "upstream",
+    "api"
+  ],
+  "author": "Vladlen Fedosov <vlad.fedosov@gmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/StyleT/nginx-plus-dynamic-upstream/issues"
+  },
+  "homepage": "https://github.com/StyleT/nginx-plus-dynamic-upstream#readme"
+}
