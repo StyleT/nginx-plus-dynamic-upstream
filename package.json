@@ -23,6 +23,7 @@
   "homepage": "https://github.com/StyleT/nginx-plus-dynamic-upstream#readme",
   "dependencies": {
     "request": "^2.88.0",
-    "request-promise-native": "^1.0.8"
+    "request-promise-native": "^1.0.8",
+    "url-join": "^4.0.1"
   }
 }
