@@ -4,13 +4,13 @@ const urljoin = require('url-join');
 module.exports = class NginxRegService {
     #log;
     #config;
-    #serverId = null;
+    #serverIds = [];
 
     /**
      *
      * @param config
      * @param {boolean} config.enabled
-     * @param {string} config.apiAddr - Ex: http://your.nginx.addr.net/
+     * @param {string[]} config.apiAddrs - Ex: http://your.nginx.addr.net/
      * @param {string} config.upstreamName
      * @param {string} config.myAddr - app's address that will be registered in Nginx. Should be accessible by Nginx
      * @param logger
@@ -23,13 +23,12 @@ module.exports = class NginxRegService {
             return;
         }
 
-        if (!config.apiAddr) {
-            throw new Error('You need to specify Nginx API address');
+        if (!config.apiAddrs || !Array.isArray(config.apiAddrs)) {
+            throw new Error('You need to specify Nginx API addresses');
         }
         if (!config.upstreamName) {
             throw new Error('You need to specify Nginx upstream name for the app');
         }
-
     }
 
     async initHandler() {
@@ -37,29 +36,38 @@ module.exports = class NginxRegService {
             return;
         }
 
-        const res = await this.#sendReq(
-            `/api/4/http/upstreams/${this.#config.upstreamName}/servers`,
-            'POST',
-            {
-                server: this.#getMyAddr(),
+        for (let addr of this.#config.apiAddrs) {
+            const res = await this.#sendReq(
+                urljoin(addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`),
+                'POST',
+                {
+                    server: this.#getMyAddr(),
+                });
+
+            this.#serverIds.push({
+                id: res.id,
+                addr,
             });
 
-        this.#serverId = res.id;
-
-        this.#log.log(`Successfully registered in Nginx with ID: ${this.#serverId}`);
+            this.#log.log(`Successfully registered in Nginx "${addr}" with ID: ${res.id}`);
+        }
     }
 
     async exitHandler() {
-        if (!this.#config.enabled || this.#serverId === null) {
+        if (!this.#config.enabled || this.#serverIds.length === 0) {
             return;
         }
 
-        const res = await this.#sendReq(
-            `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${this.#serverId}`,
-            'DELETE',
-        );
+        for (let row of this.#serverIds) {
+            await this.#sendReq(
+                urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${row.id}`),
+                'DELETE',
+            );
 
-        this.#log.log('Successfully unregistered in Nginx');
+            this.#log.log('Successfully unregistered in Nginx');
+        }
+
+        this.#serverIds = [];
     }
 
     #getMyAddr = () => {
@@ -70,10 +78,10 @@ module.exports = class NginxRegService {
         return this.#config.myAddr;
     };
 
-    #sendReq = async (path, method = 'GET', data = undefined) => {
+    #sendReq = async (uri, method = 'GET', data = undefined) => {
         const options = {
             method: method,
-            uri: urljoin(this.#config.apiAddr, path),
+            uri,
             body: data,
             json: true // Automatically stringifies the body to JSON
         };
