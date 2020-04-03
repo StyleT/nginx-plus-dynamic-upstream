@@ -36,20 +36,27 @@ module.exports = class NginxRegService {
             return;
         }
 
-        for (let addr of this.#config.apiAddrs) {
-            const res = await this.#sendReq(
-                urljoin(addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`),
-                'POST',
-                {
-                    server: this.#getMyAddr(),
+        try {
+            for (let addr of this.#config.apiAddrs) {
+                const res = await this.#sendReq(
+                    urljoin(addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`),
+                    'POST',
+                    {
+                        server: this.#getMyAddr(),
+                    });
+
+                this.#serverIds.push({
+                    id: res.id,
+                    addr,
                 });
 
-            this.#serverIds.push({
-                id: res.id,
-                addr,
-            });
-
-            this.#log.log(`Successfully registered in Nginx "${addr}" with ID: ${res.id}`);
+                this.#log.log(`Successfully registered in Nginx "${addr}" with ID: ${res.id}`);
+            }
+        } catch (e) {
+            this.#log.log(`Error during registration in one of the Nginx servers. Trying to rollback previous registrations...`);
+            this.#log.log(e);
+            await this.exitHandler();
+            throw e;
         }
     }
 
