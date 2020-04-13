@@ -67,7 +67,7 @@ module.exports = class NginxRegService {
         for (let row of this.#serverIds) {
             try {
                 const servers = await this.#sendReq(urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`));
-                const myServer = servers.filter(row => row.server === this.#getMyAddr());
+                const myServer = servers.find(row => row.server === this.#getMyAddr());
                 if (myServer === undefined) {
                     this.#log.log(`Failed to find ID of the upstream server at "${row.addr}"`);
                     continue;
