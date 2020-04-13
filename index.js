@@ -46,7 +46,6 @@ module.exports = class NginxRegService {
                     });
 
                 this.#serverIds.push({
-                    id: res.id,
                     addr,
                 });
 
@@ -66,12 +65,24 @@ module.exports = class NginxRegService {
         }
 
         for (let row of this.#serverIds) {
-            await this.#sendReq(
-                urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${row.id}`),
-                'DELETE',
-            );
+            try {
+                const servers = await this.#sendReq(urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`));
+                const myServer = servers.filter(row => row.server === this.#getMyAddr());
+                if (myServer === undefined) {
+                    this.#log.log(`Failed to find ID of the upstream server at "${row.addr}"`);
+                    continue;
+                }
 
-            this.#log.log('Successfully unregistered in Nginx');
+                await this.#sendReq(
+                    urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${myServer.id}`),
+                    'DELETE',
+                );
+
+                this.#log.log(`Successfully unregistered in Nginx "${row.addr}"`);
+            } catch (e) {
+                this.#log.log(`Error during deregistration at "${row.addr}" Nginx server...`);
+                this.#log.log(e);
+            }
         }
 
         this.#serverIds = [];
