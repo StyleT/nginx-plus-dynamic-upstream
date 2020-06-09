@@ -4,7 +4,7 @@ const urljoin = require('url-join');
 module.exports = class NginxRegService {
     #log;
     #config;
-    #serverIds = [];
+    #nginxServers = [];
 
     /**
      *
@@ -38,6 +38,9 @@ module.exports = class NginxRegService {
 
         try {
             for (let addr of this.#config.apiAddrs) {
+                // If K8s kills container by OOM killer - after restart we'll get same IP address. So it's a good time to do some cleanup.
+                await this.#deleteServersAtNginx(addr);
+
                 const res = await this.#sendReq(
                     urljoin(addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`),
                     'POST',
@@ -45,7 +48,7 @@ module.exports = class NginxRegService {
                         server: this.#getMyAddr(),
                     });
 
-                this.#serverIds.push({
+                this.#nginxServers.push({
                     addr,
                 });
 
@@ -60,23 +63,17 @@ module.exports = class NginxRegService {
     }
 
     async exitHandler() {
-        if (!this.#config.enabled || this.#serverIds.length === 0) {
+        if (!this.#config.enabled || this.#nginxServers.length === 0) {
             return;
         }
 
-        for (let row of this.#serverIds) {
+        for (let row of this.#nginxServers) {
             try {
-                const servers = await this.#sendReq(urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`));
-                const myServer = servers.find(row => row.server === this.#getMyAddr());
-                if (myServer === undefined) {
+                const removedEntries = await this.#deleteServersAtNginx(row.addr);
+                if (removedEntries === 0) {
                     this.#log.log(`Failed to find ID of the upstream server at "${row.addr}"`);
                     continue;
                 }
-
-                await this.#sendReq(
-                    urljoin(row.addr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${myServer.id}`),
-                    'DELETE',
-                );
 
                 this.#log.log(`Successfully unregistered in Nginx "${row.addr}"`);
             } catch (e) {
@@ -85,8 +82,22 @@ module.exports = class NginxRegService {
             }
         }
 
-        this.#serverIds = [];
+        this.#nginxServers = [];
     }
+
+    #deleteServersAtNginx = async (nginxAddr) => {
+        const servers = await this.#sendReq(urljoin(nginxAddr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers`));
+        const myEntries = servers.filter(row => row.server === this.#getMyAddr());
+
+        for (let row of myEntries) {
+            await this.#sendReq(
+                urljoin(nginxAddr, `/api/4/http/upstreams/${this.#config.upstreamName}/servers/${row.id}`),
+                'DELETE',
+            );
+        }
+
+        return myEntries.length;
+    };
 
     #getMyAddr = () => {
         if (!this.#config.myAddr) {
